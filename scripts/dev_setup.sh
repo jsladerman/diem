@@ -429,8 +429,8 @@ function install_dotnet {
 
 function install_boogie {
   echo "Installing boogie"
-  export DOTNET_ROOT=$HOME/.dotnet
-  if [[ "$("$HOME"/.dotnet/dotnet tool list -g)" =~ .*boogie.*${BOOGIE_VERSION}.* ]]; then
+  mkdir -p "${DOTNET_INSTALL_DIR}tools/" || true
+  if [[ "$("${DOTNET_INSTALL_DIR}dotnet" tool list --tool-path "${DOTNET_INSTALL_DIR}tools/")" =~ .*boogie.*${BOOGIE_VERSION}.* ]]; then
     echo "Boogie $BOOGIE_VERSION already installed"
   else
     "$HOME/.dotnet/dotnet" tool update --global Boogie --version $BOOGIE_VERSION
