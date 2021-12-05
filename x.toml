@@ -174,7 +174,6 @@ members = [
     "bytecode-interpreter-testsuite",
     "bytecode-verifier-tests",
     "cli",
-    "cluster-test",
     "diem-documentation-tool",
     "diem-e2e-tests-replay",
     "diem-fuzz",

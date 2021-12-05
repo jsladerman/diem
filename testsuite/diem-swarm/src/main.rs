@@ -110,45 +110,7 @@ fn main() {
         (port, debug_interface_port)
     });
 
-    let node_address_list = ports
-        .clone()
-        .map(|port| format!("localhost:{}", port.0))
-        .collect::<Vec<String>>()
-        .join(",");
-
-    println!("To run transaction generator run:");
-    println!(
-        "\tcluster-test --mint-file {:?} --swarm --peers {:?} --emit-tx --workers-per-ac 1",
-        diem_root_key_path, node_address_list,
-    );
-
-    let node_address_list = ports
-        .map(|port| format!("localhost:{}:{}", port.0, port.1))
-        .collect::<Vec<String>>()
-        .join(",");
-
-    println!("To run health check:");
-    println!(
-        "\tcluster-test --mint-file {:?} --swarm --peers {:?} --health-check --duration 30",
-        diem_root_key_path, node_address_list,
-    );
-
-    if let Some(ref swarm) = full_node_swarm {
-        let full_node_config = NodeConfig::load(&swarm.config.config_files[0]).unwrap();
-        println!("To connect to the full nodes you just spawned, use this command:");
-        println!(
-            "\tcli -u {} -m {:?} --waypoint {} --chain-id {}",
-            format!(
-                "http://localhost:{}",
-                full_node_config.json_rpc.address.port()
-            ),
-            diem_root_key_path,
-            waypoint,
-            ChainId::test().id(),
-        );
-    }
-
-    let faucet = if args.start_faucet {
+    let _faucet = if args.start_faucet {
         let faucet_port = diem_config::utils::get_available_port();
         let server_port = validator_swarm.get_client_port(0);
         println!("Starting faucet service at port: {}", faucet_port);

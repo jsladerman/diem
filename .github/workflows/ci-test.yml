@@ -156,7 +156,7 @@ jobs:
     strategy:
       matrix:
         target_images:
-          [client faucet cluster-test, init tools validator validator-tcb]
+          [client faucet forge, init tools validator validator-tcb]
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -1000,3 +1000,213 @@ jobs:
           retention-days: 5
           path: |
             /tmp/benches
+      - name: Early terminate workflow
+        if: ${{ failure() }}
+        uses: ./.github/actions/early-terminator
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+
+  build-move-analyzer-vscode-extension:
+    name: Build VS Code extension for move-analyzer
+    runs-on: ubuntu-20.04
+    needs:
+      - prepare
+    steps:
+      - uses: actions/checkout@v2.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Use Node.js 14
+        uses: actions/setup-node@v2.4.0
+        with:
+          node-version: '14'
+      - name: Install NPM dependencies
+        working-directory: language/move-analyzer/editors/code
+        run: npm install
+      - name: Build the extension
+        working-directory: language/move-analyzer/editors/code
+        run: npm run pretest
+      - name: Test the extension
+        # VS Code tests require display output. This action simulates such a
+        # display, using Xvfb. (It's roughly equivalent to prefixing the 'run'
+        # commands below with `xvfb-run <command>`.) Without a simulated display
+        # such as this one, the tests would fail with the error message:
+        # "Unable to open X display."
+        uses: GabrielBB/xvfb-action@v1.5
+        with:
+          working-directory: language/move-analyzer/editors/code
+          run: npm run test
+      - name: Package the extension
+        working-directory: language/move-analyzer/editors/code
+        run: npm run package
+      - name: Upload VS Code extension
+        uses: actions/upload-artifact@v2
+        with:
+          name: move-analyzer-vscode-extension
+          path: language/move-analyzer/editors/code/move-analyzer.vsix
+      - name: Early terminate workflow
+        if: ${{ failure() }}
+        uses: ./.github/actions/early-terminator
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+
+  developers-site:
+    name: run-developer-site-build
+    runs-on: ubuntu-20.04
+    if: ${{ needs.prepare.outputs.test-website-build == 'true' }}
+    steps:
+      # Checks-out the Diem website repository under $GITHUB_WORKSPACE, so job can access it
+      - uses: actions/checkout@v2.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/cache@v2.1.6
+      # Installs node and yarn
+      - name: Use Node.js 14
+        uses: actions/setup-node@v2.4.1
+        with:
+          node-version: '14'
+      # Install git
+      - name: Install git
+        run: |
+          sudo apt --assume-yes update
+          sudo apt --assume-yes install git
+      # Install Python 3.8
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      # Test that building the site is successful
+      - name: Build Site
+        run: |
+          cd developers.diem.com
+          # Only build the straight Docusaurus site now. Do not build rust `-r`
+          # or python docs `-p` on CI checks until we resolve the best way to
+          # build them for deployment
+          ./scripts/build_docs.sh -b
+      - name: Early terminate workflow
+        if: ${{ failure() }}
+        uses: ./.github/actions/early-terminator
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+
+  land-blocking-test-forge:
+    name: Run land blocking test in Forge
+    runs-on: self-hosted
+    needs: [prepare, build-images, need-base-images]
+    if: ${{ always() && needs.build-images.result=='success' && needs.prepare.outputs.test-land-blocking == 'true' }}
+    outputs:
+      forge-result: ${{ steps.post-test-result.outputs.forge-result }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v2.4.0
+        with:
+          # This ensures that the tip of the PR is checked out instead of the merge between the base ref and the tip
+          # On `push` this value will be empty and will "do-the-right-thing"
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Launch forge test
+        run: |
+          set +e
+          date
+          export FGI_OUTPUT_LOG=$(mktemp)
+          echo "FGI_OUTPUT_LOG=$FGI_OUTPUT_LOG" >> $GITHUB_ENV
+          cmd=""
+          if ${{ needs.need-base-images.result!='success' }}; then
+            cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --suite land_blocking --report forge_report.json"
+          else
+            cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --base-image-tag ${{ needs.need-base-images.outputs.prev-tag }} --suite land_blocking_compat --report forge_report.json"
+          fi
+          eval $cmd
+          ret=$?
+          echo "fgi exit code: $ret"
+          echo "FGI_REPRO_CMD=$cmd" >> $GITHUB_ENV
+          echo "FGI_EXIT_CODE=$ret" >> $GITHUB_ENV
+      - name: Post test results on PR
+        uses: actions/github-script@v4.0.2
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            // Find the number of the pull request that trigggers this push
+            let pr_num = ${{ needs.prepare.outputs.changes-pull-request-number }};
+            if (!pr_num) {
+              console.warn("Did not find pull request num in previous step");
+              console.log("GH event payload\n", context.payload);
+              return;
+            }
+            // Read and check forge test results
+            let should_fail = false;
+            let env_vars = process.env;
+            let body = '';
+            const fsp = require('fs').promises;
+            try {
+              data = await fsp.readFile('forge_report.json', 'utf-8');
+              var result = JSON.parse(data);
+              // TODO - set P/F based on metrics TPS, latency
+              body = `Forge Test Result
+            \`\`\`
+            ${result.text}
+            ${result.logs}
+            ${result.dashboard}
+            \`\`\`
+            `;
+              // Check FGI exit code for errors
+              if (parseInt(env_vars.FGI_EXIT_CODE) != 0) {
+                body += "\n :exclamation: Forge Test failed - non-zero exit code for `fgi` \n"
+                should_fail = true;
+              }
+            } catch (err) {
+              if (err.code === 'ENOENT') {
+                body = "Forge Test failed - no test report found.\n";
+              } else {
+                body = "Forge Test runner failed.";
+                console.error(err);
+              }
+              body += " See https://github.com/diem/diem/actions/runs/${{github.run_id}}";
+              // Post comment on PR then fail this workflow
+              should_fail = true;
+            }
+            // Add repro cmd to message
+            try {
+              body += "\nRepro cmd:\n";
+              body += `
+              \`\`\`
+              ${env_vars.FGI_REPRO_CMD}
+              \`\`\`
+              `
+            } catch (err) {
+              if (err.code === 'ReferenceError') {
+                console.error("One of the following env vars is not set");
+              } else {
+                body += "[GHA DEBUG]\nFound error in actions/github-script\n";
+                body += err;
+              }
+            }
+            // Post test result on original pull request
+            try {
+              if (!should_fail) {
+                body += "\n :tada: Land-blocking forge test passed! :ok_hand:"
+              }
+              await github.issues.createComment(
+                  {
+                    issue_number: pr_num,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    body: body,
+                  }
+              );
+            } catch (err) {
+              if (err.status === 401) {
+                // Fail silently for auth but log to console.
+                console.warn("GH token has expired when trying to POST\n", err);
+              } else {
+                console.error("HttpError other than 401 is not bypassed");
+                throw err;
+              }
+            }
+            // Fail the workflow if test fails
+            if (should_fail) {
+              throw "Land-blocking test failed";
+            }
+      - name: Early terminate workflow
+        if: ${{ failure() }}
+        uses: ./.github/actions/early-terminator
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
