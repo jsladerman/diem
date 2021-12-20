@@ -173,7 +173,8 @@ members = [
 
     "bytecode-interpreter-testsuite",
     "bytecode-verifier-tests",
-    "cli",
+    "bytecode-verifier-transactional-tests",
+    "testcases",
     "diem-documentation-tool",
     "diem-e2e-tests-replay",
     "diem-fuzz",

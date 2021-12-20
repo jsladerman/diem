@@ -158,8 +158,6 @@ members = [
     "storage/storage-client",
     "storage/storage-interface",
     "storage/storage-service",
-    "testsuite/cli",
-    "testsuite/cli/diem-wallet",
     "testsuite/diem-fuzzer",
     "testsuite/diem-fuzzer/fuzz",
     "testsuite/diem-swarm",
