@@ -44,6 +44,7 @@ function usage {
   echo "-o install operations tooling as well: helm, terraform, hadolint, yamllint, vault, docker, kubectl, python3"
   echo "-y installs or updates Move prover tools: z3, cvc4, dotnet, boogie"
   echo "-s installs or updates requirements to test code-generation for Move SDKs"
+  echo "-a install tools for build and test api"
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
   echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
@@ -61,7 +62,7 @@ function add_to_profile {
 
 
 # It is important to keep all path updates together to allow this script to work well when run in github actions
-# on inside of a docker image created using this script.   GHA wipes the home directory via docker mount options, so
+# inside of a docker image created using this script.   GHA wipes the home directory via docker mount options, so
 # this profile needs built and sourced on every execution of a job using the docker image.   See the .github/actions/build-setup
 # action in this repo, as well as docker/ci/github/Dockerfile.
 function update_path_and_profile {
@@ -70,7 +71,7 @@ function update_path_and_profile {
   DOTNET_ROOT="$HOME/.dotnet"
   BIN_DIR="$HOME/bin"
   C_HOME="${HOME}/.cargo"
-  if [[ -n "$OPT_DIR" ]]; then
+  if [[ "$OPT_DIR" == "true" ]]; then
     DOTNET_ROOT="/opt/dotnet"
     BIN_DIR="/opt/bin"
     C_HOME="/opt/cargo"
@@ -91,6 +92,7 @@ function update_path_and_profile {
     add_to_profile "export BOOGIE_EXE=\"${DOTNET_ROOT}/tools/boogie\""
   fi
   if [[ "$INSTALL_CODEGEN" == "true" ]] && [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+    add_to_profile "export PATH=\$PATH:${INSTALL_DIR}swift/usr/bin"
     if [[ -n "${GOBIN}" ]]; then
       add_to_profile "export PATH=\$PATH:/usr/lib/golang/bin"
     else
@@ -253,11 +255,11 @@ function install_awscli {
       unzip -qq -d "$TMPFILE"/work/ "$TMPFILE"/aws.zip
       TARGET_DIR="${HOME}"/.local/
       if [[ "$OPT_DIR" == "true" ]]; then
-         TARGET_DIR="/opt/aws"
+         TARGET_DIR="/opt/aws/"
       fi
-      mkdir -p "${TARGET_DIR}" || true
-      "$TMPFILE"/work/aws/install -i "${TARGET_DIR}"/aws-cli -b "${INSTALL_DIR}"
-      rm -rf "$TMPFILE"
+      mkdir -p "${TARGET_DIR}"
+      "$TMPFILE"/work/aws/install -i "${TARGET_DIR}" -b "${INSTALL_DIR}"
+      "${INSTALL_DIR}"aws --version
     fi
   fi
 }
@@ -269,7 +271,7 @@ function install_pkg {
   if [ "$(whoami)" != 'root' ]; then
     PRE_COMMAND=(sudo)
   fi
-  if which "$package" &>/dev/null; then
+  if command -v "$package" &>/dev/null; then
     echo "$package is already installed"
   else
     echo "Installing ${package}."
@@ -400,9 +402,9 @@ function install_sccache {
     if [[ -n "${SCCACHE_GIT}" ]]; then
       git_repo=$( echo "$SCCACHE_GIT" | cut -d "@" -f 1 );
       git_hash=$( echo "$SCCACHE_GIT" | cut -d "@" -f 2 );
-      cargo install sccache --git "$git_repo" --rev "$git_hash" --features s3;
+      cargo install sccache --git "$git_repo" --rev "$git_hash" --features s3 --locked
     else
-      cargo install sccache --version="${SCCACHE_VERSION}" --features s3;
+      cargo install sccache --version="${SCCACHE_VERSION}" --features s3 --locked
     fi
   fi
 }
@@ -411,7 +413,7 @@ function install_cargo_guppy {
   if ! command -v cargo-guppy &> /dev/null; then
     git_repo=$( echo "$GUPPY_GIT" | cut -d "@" -f 1 );
     git_hash=$( echo "$GUPPY_GIT" | cut -d "@" -f 2 );
-    cargo install cargo-guppy --git "$git_repo" --rev "$git_hash";
+    cargo install cargo-guppy --git "$git_repo" --rev "$git_hash" --locked
   fi
 }
 
@@ -457,7 +459,7 @@ function install_dotnet {
 function install_boogie {
   echo "Installing boogie"
   mkdir -p "${DOTNET_INSTALL_DIR}tools/" || true
-  if [[ "$("${DOTNET_INSTALL_DIR}dotnet" tool list -g)" =~ .*boogie.*${BOOGIE_VERSION}.* ]]; then
+  if [[ "$("${DOTNET_INSTALL_DIR}dotnet" tool list --tool-path "${DOTNET_INSTALL_DIR}tools/")" =~ .*boogie.*${BOOGIE_VERSION}.* ]]; then
     echo "Boogie $BOOGIE_VERSION already installed"
   else
     "${DOTNET_INSTALL_DIR}dotnet" tool update --tool-path "${DOTNET_INSTALL_DIR}tools/" Boogie --version $BOOGIE_VERSION
@@ -466,19 +468,19 @@ function install_boogie {
 
 function install_z3 {
   echo "Installing Z3"
-  if which /usr/local/bin/z3 &>/dev/null; then
+  if command -v /usr/local/bin/z3 &>/dev/null; then
     echo "z3 already exists at /usr/local/bin/z3"
     echo "but this install will go to ${INSTALL_DIR}/z3."
     echo "you may want to remove the shared instance to avoid version confusion"
   fi
-  if which "${INSTALL_DIR}z3" &>/dev/null && [[ "$("${INSTALL_DIR}z3" --version || true)" =~ .*${Z3_VERSION}.* ]]; then
+  if command -v "${INSTALL_DIR}z3" &>/dev/null && [[ "$("${INSTALL_DIR}z3" --version || true)" =~ .*${Z3_VERSION}.* ]]; then
      echo "Z3 ${Z3_VERSION} already installed"
      return
   fi
   if [[ "$(uname)" == "Linux" ]]; then
-    Z3_PKG="z3-$Z3_VERSION-x64-ubuntu-16.04"
+    Z3_PKG="z3-$Z3_VERSION-x64-glibc-2.28"
   elif [[ "$(uname)" == "Darwin" ]]; then
-    Z3_PKG="z3-$Z3_VERSION-x64-osx-10.14.6"
+    Z3_PKG="z3-$Z3_VERSION-x64-osx-10.16"
   else
     echo "Z3 support not configured for this platform (uname=$(uname))"
     return
@@ -488,7 +490,7 @@ function install_z3 {
   mkdir -p "$TMPFILE"/
   (
     cd "$TMPFILE" || exit
-    curl -LOs "https://github.com/Z3Prover/z3/releases/download/z3-$Z3_VERSION/$Z3_PKG.zip"
+    curl -LOs "https://github.com/junkil-park/z3/releases/download/z3-$Z3_VERSION/$Z3_PKG.zip"
     unzip -q "$Z3_PKG.zip"
     cp "$Z3_PKG/bin/z3" "${INSTALL_DIR}"
     chmod +x "${INSTALL_DIR}z3"
@@ -531,15 +533,11 @@ function install_cvc4 {
 function install_golang {
     if [[ $(go version | grep -c "go1.14" || true) == "0" ]]; then
       if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-        if ! grep -q 'buster-backports main' /etc/apt/sources.list; then
-          (
-            echo "deb http://http.us.debian.org/debian/ buster-backports main"
-            echo "deb-src http://http.us.debian.org/debian/ buster-backports main"
-          ) | "${PRE_COMMAND[@]}" tee -a /etc/apt/sources.list
-          "${PRE_COMMAND[@]}" apt-get update
-        fi
-        "${PRE_COMMAND[@]}" apt-get install -y golang-1.14-go/buster-backports
-        "${PRE_COMMAND[@]}" ln -sf /usr/lib/go-1.14 /usr/lib/golang
+        curl -LO https://golang.org/dl/go1.14.15.linux-amd64.tar.gz
+        "${PRE_COMMAND[@]}" rm -rf /usr/local/go
+        "${PRE_COMMAND[@]}" tar -C /usr/local -xzf go1.14.15.linux-amd64.tar.gz
+        "${PRE_COMMAND[@]}" ln -sf /usr/local/go /usr/lib/golang
+        rm go1.14.15.linux-amd64.tar.gz
       elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
         apk --update add --no-cache git make musl-dev go
       elif [[ "$PACKAGE_MANAGER" == "brew" ]]; then
@@ -551,6 +549,26 @@ function install_golang {
         install_pkg golang "$PACKAGE_MANAGER"
       fi
     fi
+}
+
+function install_deno {
+  curl -fsSL https://deno.land/x/install/install.sh | sh
+  cp "${HOME}/.deno/bin/deno" "${INSTALL_DIR}"
+  chmod +x "${INSTALL_DIR}deno"
+}
+
+function install_swift {
+    echo Installing Swift.
+    install_pkg wget "$PACKAGE_MANAGER"
+    install_pkg libncurses5 "$PACKAGE_MANAGER"
+    install_pkg clang "$PACKAGE_MANAGER"
+    install_pkg libcurl4 "$PACKAGE_MANAGER"
+    install_pkg libpython2.7 "$PACKAGE_MANAGER"
+    install_pkg libpython2.7-dev "$PACKAGE_MANAGER"
+    wget -q https://swift.org/builds/swift-5.3.3-release/ubuntu1804/swift-5.3.3-RELEASE/swift-5.3.3-RELEASE-ubuntu18.04.tar.gz
+    tar xzf swift-5.3.3-RELEASE-ubuntu18.04.tar.gz
+    rm -rf swift-5.3.3-RELEASE-ubuntu18.04.tar.gz
+    mv swift-5.3.3-RELEASE-ubuntu18.04 "${INSTALL_DIR}swift"
 }
 
 function install_java {
@@ -570,7 +588,7 @@ function install_allure {
         "${PRE_COMMAND[@]}" apt-get install default-jre -y --no-install-recommends
         export ALLURE=${HOME}/allure_"${ALLURE_VERSION}"-1_all.deb
         curl -sL -o "$ALLURE" "https://github.com/diem/allure2/releases/download/${ALLURE_VERSION}/allure_${ALLURE_VERSION}-1_all.deb"
-        dpkg -i "$ALLURE"
+        "${PRE_COMMAND[@]}" dpkg -i "$ALLURE"
         rm "$ALLURE"
       elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
         apk --update add --no-cache  -X http://dl-cdn.alpinelinux.org/alpine/edge/community openjdk11
@@ -586,6 +604,26 @@ function install_xsltproc {
     else
       install_pkg libxslt "$PACKAGE_MANAGER"
     fi
+}
+
+function install_nodejs {
+    if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+      curl -fsSL https://deb.nodesource.com/setup_14.x | "${PRE_COMMAND[@]}" bash -
+    fi
+    install_pkg nodejs "$PACKAGE_MANAGER"
+    install_pkg npm "$PACKAGE_MANAGER"
+}
+
+function install_python3 {
+  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+    install_pkg python3-all-dev "$PACKAGE_MANAGER"
+    install_pkg python3-setuptools "$PACKAGE_MANAGER"
+    install_pkg python3-pip "$PACKAGE_MANAGER"
+  elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
+    install_pkg python3-dev "$PACKAGE_MANAGER"
+  else
+    install_pkg python3 "$PACKAGE_MANAGER"
+  fi
 }
 
 function welcome_message {
@@ -610,6 +648,7 @@ Build tools (since -t or no option was provided):
   * libssl-dev
   * sccache
   * if linux, gcc-powerpc-linux-gnu
+  * NodeJS / NPM
 EOF
   fi
 
@@ -645,7 +684,15 @@ Codegen tools (since -s was provided):
   * Python3 (numpy, pyre-check)
   * Golang
   * Java
-  * Node-js/NPM
+  * Deno
+  * Swift
+EOF
+  fi
+
+  if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
+cat <<EOF
+API build and testing tools (since -a was provided):
+  * Python3 (schemathesis)
 EOF
   fi
 
@@ -668,13 +715,14 @@ OPERATIONS=false;
 INSTALL_PROFILE=false;
 INSTALL_PROVER=false;
 INSTALL_CODEGEN=false;
+INSTALL_API_BUILD_TOOLS=false;
 INSTALL_INDIVIDUAL=false;
 INSTALL_PACKAGES=();
-INSTALL_DIR="$HOME/bin/"
+INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
 
 #parse args
-while getopts "btopvysh:i:n" arg; do
+while getopts "btopvysah:i:n" arg; do
   case "$arg" in
     b)
       BATCH_MODE="true"
@@ -696,6 +744,9 @@ while getopts "btopvysh:i:n" arg; do
       ;;
     s)
       INSTALL_CODEGEN="true"
+      ;;
+    a)
+      INSTALL_API_BUILD_TOOLS="true"
       ;;
     i)
       INSTALL_INDIVIDUAL="true"
@@ -721,6 +772,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
    [[ "$INSTALL_PROFILE" == "false" ]] && \
    [[ "$INSTALL_PROVER" == "false" ]] && \
    [[ "$INSTALL_CODEGEN" == "false" ]] && \
+   [[ "$INSTALL_API_BUILD_TOOLS" == "false" ]] && \
    [[ "$INSTALL_INDIVIDUAL" == "false" ]]; then
    INSTALL_BUILD_TOOLS="true"
 fi
@@ -758,7 +810,7 @@ if [[ "$(uname)" == "Linux" ]]; then
 		exit 1
 	fi
 elif [[ "$(uname)" == "Darwin" ]]; then
-	if which brew &>/dev/null; then
+	if command -v brew &>/dev/null; then
 		PACKAGE_MANAGER="brew"
 	else
 		echo "Missing package manager Homebrew (https://brew.sh/). Abort"
@@ -818,6 +870,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_grcov
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"
+  install_nodejs "$PACKAGE_MANAGER"
 fi
 
 if [[ "$OPERATIONS" == "true" ]]; then
@@ -869,25 +922,29 @@ fi
 if [[ "$INSTALL_CODEGEN" == "true" ]]; then
   install_pkg clang "$PACKAGE_MANAGER"
   install_pkg llvm "$PACKAGE_MANAGER"
-  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    install_pkg python3-all-dev "$PACKAGE_MANAGER"
-    install_pkg python3-setuptools "$PACKAGE_MANAGER"
-    install_pkg python3-pip "$PACKAGE_MANAGER"
-  elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
-    install_pkg python3-dev "$PACKAGE_MANAGER"
-  else
-    install_pkg python3 "$PACKAGE_MANAGER"
-  fi
-  install_pkg nodejs "$PACKAGE_MANAGER"
-  install_pkg npm "$PACKAGE_MANAGER"
+  install_python3
+  install_deno
   install_java
   install_golang
+  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+    # Only looked at this for a little while, but depends on glibc so alpine
+    # support isn't easily added. On Mac it requires XCode to be installed,
+    # which is quite largs, so probably something we don't want to download in
+    # this script.
+    install_swift
+  fi
   if [[ "$PACKAGE_MANAGER" != "apk" ]]; then
     # depends on wheels which needs glibc which doesn't work on alpine's python.
     # Only invested a hour or so in this, a work around may exist.
     "${PRE_COMMAND[@]}" python3 -m pip install pyre-check=="${PYRE_CHECK_VERSION}"
   fi
   "${PRE_COMMAND[@]}" python3 -m pip install numpy=="${NUMPY_VERSION}"
+fi
+
+if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
+  # python and tools
+  install_python3
+  "${PRE_COMMAND[@]}" python3 -m pip install schemathesis
 fi
 
 if [[ "${BATCH_MODE}" == "false" ]]; then
