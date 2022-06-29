@@ -881,6 +881,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "chrono",
+ "compiler",
+ "crash-handler",
+ "diem-client",
+ "diem-config",
+ "diem-crypto",
+ "diem-framework",
+ "diem-framework-releases",
+ "diem-infallible",
+ "diem-logger",
+ "diem-metrics",
+ "diem-resource-viewer",
+ "diem-temppath",
+ "diem-transaction-builder",
+ "diem-types",
+ "diem-wallet",
+ "diem-workspace-hack",
+ "generate-key",
+ "hex",
+ "move-symbol-pool",
+ "move-vm-test-utils",
+ "num-traits",
+ "once_cell",
+ "proptest",
+ "reqwest",
+ "rust_decimal",
+ "rustyline",
+ "serde",
+ "structopt 0.3.21",
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
 name = "codespan"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2820,6 +2859,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "endian-type"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
+
+[[package]]
 name = "enum_dispatch"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3129,31 +3174,6 @@ checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
 dependencies = [
  "libc",
  "winapi 0.3.9",
-name = "framework-releases"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "clap",
- "diem-types",
- "diem-workspace-hack",
- "include_dir",
- "log",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-package",
- "move-vm-runtime",
- "move-vm-types",
- "once_cell",
- "rayon",
- "sha2",
- "smallvec",
- "structopt 0.3.21",
- "walkdir",
 ]
 
 [[package]]
@@ -3298,6 +3318,16 @@ dependencies = [
  "proc-macro-hack",
  "proc-macro-nested",
  "slab",
+]
+
+[[package]]
+name = "gag"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cc0b9f53275dc5fada808f1d2f82e3688a6c14d735633d1590b7be8eb2307b5"
+dependencies = [
+ "libc",
+ "tempfile",
 ]
 
 [[package]]
@@ -4669,6 +4699,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-oncall-trainer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "cli",
+ "diem-client",
+ "diem-config",
+ "diem-framework-releases",
+ "diem-genesis-tool",
+ "diem-json-rpc-types",
+ "diem-node",
+ "diem-temppath",
+ "diem-types",
+ "diem-workspace-hack",
+ "gag",
+ "nix",
+ "rustyline",
+ "structopt 0.3.21",
+ "tempfile",
+]
+
+[[package]]
 name = "move-package"
 version = "0.1.0"
 dependencies = [
@@ -5065,6 +5118,15 @@ dependencies = [
  "signal-hook",
  "structopt 0.3.21",
  "termcolor",
+]
+
+[[package]]
+name = "nibble_vec"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a5d83df9f36fe23f0c3648c6bbb8b0298bb5f1939c8f2704431371f4b84d43"
+dependencies = [
+ "smallvec",
 ]
 
 [[package]]
@@ -5913,6 +5975,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "941ba9d78d8e2f7ce474c015eea4d9c6d25b6a3327f9832ee29a4de27f91bbb8"
 
 [[package]]
+name = "radix_trie"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c069c179fcdc6a2fe24d8d18305cf085fdbd4f922c041943e203685d6a1c58fd"
+dependencies = [
+ "endian-type",
+ "nibble_vec",
+]
+
+[[package]]
 name = "rand"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6276,10 +6348,6 @@ dependencies = [
  "num-traits",
  "serde",
 ]
-name = "rust-ini"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e52c148ef37f8c375d49d5a73aa70713125b7f19095948a923f80afdeb22ec2"
 
 [[package]]
 name = "rustc-demangle"
@@ -6334,6 +6402,29 @@ dependencies = [
  "quick-error 1.2.3",
  "tempfile",
  "wait-timeout",
+]
+
+[[package]]
+name = "rustyline"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e1b597fcd1eeb1d6b25b493538e5aa19629eb08932184b85fef931ba87e893"
+dependencies = [
+ "bitflags",
+ "cfg-if 1.0.0",
+ "dirs-next",
+ "fs2",
+ "libc",
+ "log",
+ "memchr",
+ "nix",
+ "radix_trie",
+ "scopeguard",
+ "smallvec",
+ "unicode-segmentation",
+ "unicode-width",
+ "utf8parse",
+ "winapi 0.3.9",
 ]
 
 [[package]]
