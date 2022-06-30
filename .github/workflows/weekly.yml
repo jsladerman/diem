@@ -9,11 +9,11 @@ jobs:
   dep-report:
     runs-on: ubuntu-latest
     container:
-      image: diem/build_environment:latest
+      image: ghcr.io/diem/diem_build_environment:latest
     env:
       MESSAGE_PAYLOAD_FILE: /tmp/message
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.4.0
         with:
             # fetch full history
             fetch-depth: 0
@@ -27,9 +27,9 @@ jobs:
           webhook: ${{ secrets.WEBHOOK_DEPENDENCY_CHANGES }}
 
   transaction-replay:
-    runs-on: ubuntu-latest-xl
+    runs-on: ubuntu-20.04-xl
     container:
-      image: diem/build_environment:latest
+      image: ghcr.io/diem/diem_build_environment:latest
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     env:
@@ -40,7 +40,7 @@ jobs:
       SAS: ""
       CONFIG: .github/workflows/transaction-replay.toml
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.4.0
       - uses: ./.github/actions/build-setup
       - name: install azcopy
         run: |

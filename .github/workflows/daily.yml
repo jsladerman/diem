@@ -9,9 +9,9 @@ on:
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container:
-      image: diem/build_environment:latest
+      image: ghcr.io/diem/diem_build_environment:latest
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     strategy:
@@ -19,11 +19,11 @@ jobs:
       matrix:
         #this is a painful solution since it doesn't pick up new branches, other option is lotsa shell in one job....
         #to test in canary add in canary here.....
-        target-branch: [latest, release-1.2, release-1.3]
+        target-branch: [latest, release-1.4]
     env:
       AUDIT_SUMMARY_FILE: /tmp/summary
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.4.0
         with:
           ref: ${{ matrix.target-branch }}
       - uses: ./.github/actions/build-setup
@@ -56,9 +56,9 @@ jobs:
       - uses: ./.github/actions/build-teardown
 
   coverage:
-    runs-on: ubuntu-latest-xl
+    runs-on: ubuntu-20.04-xl
     container:
-      image: diem/build_environment:latest
+      image: ghcr.io/diem/diem_build_environment:latest
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     environment:
@@ -67,7 +67,7 @@ jobs:
       CODECOV_OUTPUT: codecov
       MESSAGE_PAYLOAD_FILE: /tmp/message
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.4.0
       - uses: ./.github/actions/build-setup
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -101,9 +101,9 @@ jobs:
       #- uses: ./.github/actions/build-teardown
 
   prover-inconsistency-test:
-    runs-on: ubuntu-latest-xl
+    runs-on: ubuntu-20.04-xl
     container:
-      image: diem/build_environment:${{ matrix.target-branch }}
+      image: ghcr.io/diem/diem_build_environment:${{ matrix.target-branch }}
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     env:
@@ -111,9 +111,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target-branch: [latest, release-1.2, release-1.3]
+        target-branch: [main]
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.4.0
         with:
           ref: ${{ matrix.target-branch }}
       - uses: ./.github/actions/build-setup
@@ -127,8 +127,7 @@ jobs:
         run: |
           cd /opt/git/diem/
           set -o pipefail
-          MVP_TEST_INCONSISTENCY=1 cargo test -p move-prover --release 2>&1 | tee -a $MESSAGE_PAYLOAD_FILE
-          MVP_TEST_FEATURE=cvc4 cargo test -p move-prover --release 2>&1 | tee -a $MESSAGE_PAYLOAD_FILE
+          cargo test -p diem-framework --release -- --include-ignored 2>&1 | tee -a $MESSAGE_PAYLOAD_FILE
       - uses: ./.github/actions/slack-file
         with:
           webhook: ${{ secrets.WEBHOOK_MOVE_PROVER }}
@@ -137,12 +136,12 @@ jobs:
       - uses: ./.github/actions/build-teardown
 
   prune-docker-images:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     environment:
       name: Docker
       url: https://hub.docker.com/u/diem
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.4.0
       - name: sign in to DockerHub; install image signing cert
         uses: ./.github/actions/dockerhub_login
         with:
