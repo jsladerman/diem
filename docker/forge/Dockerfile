@@ -1,4 +1,6 @@
-FROM debian:buster-20210721@sha256:cc58a29c333ee594f7624d968123429b26916face46169304f07580644dde6b2 AS toolchain
+FROM debian:buster-20211011@sha256:f9182ead292f45165f4a851e5ff98ea0800e172ccedce7d17764ffaae5ed4d6e AS debian-base
+
+FROM debian-base AS toolchain
 
 # To use http/https proxy while building, use:
 # docker build --build-arg https_proxy=http://fwdproxy:8080 --build-arg http_proxy=http://fwdproxy:8080
@@ -19,7 +21,7 @@ COPY . /diem
 
 RUN IMAGE_TARGETS="test" ./docker/build-common.sh
 
-FROM debian:buster-20210721@sha256:cc58a29c333ee594f7624d968123429b26916face46169304f07580644dde6b2
+FROM debian-base
 
 RUN apt-get update && apt-get install -y libssl1.1 openssh-client wget && apt-get clean && rm -r /var/lib/apt/lists/*
 
@@ -28,6 +30,8 @@ COPY rust-toolchain /diem/rust-toolchain
 COPY scripts/dev_setup.sh /diem/scripts/dev_setup.sh
 RUN /diem/scripts/dev_setup.sh -b -p -i kubectl -i helm -i git -i unzip -i awscli -i vault
 ENV PATH "$PATH:/root/bin"
+
+RUN helm plugin install https://github.com/hypnoglow/helm-s3.git --version 0.10.0
 
 RUN mkdir /etc/forge
 WORKDIR /etc/forge
