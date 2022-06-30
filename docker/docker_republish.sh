@@ -80,7 +80,7 @@ for image in "${TARGET_IMAGES[@]}"; do
   docker tag diem/"$renamed_image":"$DOCKERHUB_TAG" "$TARGET_REPO"/"$TARGET_ORG"/"$renamed_image":"$OUTPUT_TAG"
 done
 
-#Push the proper locations to novi ecr.
+#Push the proper locations to ACP ecr.
 
 
 
