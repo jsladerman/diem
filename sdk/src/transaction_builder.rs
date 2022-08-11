@@ -450,7 +450,16 @@ impl TransactionFactory {
             ))
         }
     }
-
+    pub fn update_attestation_limit(
+        &self,
+        sliding_nonce: u64,
+        attestation_limit: u64,
+    ) -> TransactionBuilder {
+        self.script(stdlib::encode_update_dual_attestation_limit_script(
+            sliding_nonce,
+            attestation_limit,
+        ))
+    }
     pub fn update_exchange_rate(
         &self,
         currency: Currency,

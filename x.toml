@@ -224,6 +224,7 @@ members = [
     "smoke-test",
     "socket-bench-server",
     "test-generation",
+    "testnet-regression-tests",
     "x",
     "x-core",
     "x-lint",
