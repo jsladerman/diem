@@ -1,5 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
+#![allow(dead_code)]
+
 use diem_json_rpc_types::response::JsonRpcResponse;
 use diem_sdk::{
     client::BlockingClient,
@@ -92,21 +94,17 @@ impl JsonRpcTestHelper {
     }
     pub fn get_tc_account_address() -> String {
         let addr: Result<String, VarError> = env::var("TC_ACCT_ADDR");
-        return addr
-            .unwrap_or("no tc account address".to_string())
-            .to_string();
+        addr.unwrap_or_else(|_| "no tc account address".to_string())
     }
     pub fn get_tc_account_private_key() -> String {
         let key = env::var("TC_ACCT_PRIV_KEY");
-        return key
-            .unwrap_or("no tc account private key".to_string())
-            .to_string();
+        key.unwrap_or_else(|_| "no tc account private key".to_string())
     }
     pub fn get_json_rpc_url() -> String {
-        return env::var("JSON_RPC_URL").unwrap_or("https://testnet.diem.com/v1".to_string());
+        env::var("JSON_RPC_URL").unwrap_or_else(|_| "https://testnet.diem.com/v1".to_string())
     }
     pub fn get_mint_url() -> String {
-        return env::var("FAUCET_URL").unwrap_or("https://testnet.diem.com/mint".to_string());
+        env::var("FAUCET_URL").unwrap_or_else(|_| "https://testnet.diem.com/mint".to_string())
     }
     pub fn get_metadata(&self) -> Value {
         self.send("get_metadata", json!([])).result.unwrap()
@@ -250,12 +248,12 @@ impl JsonRpcTestHelper {
         let result = resp.result.unwrap();
         let sequence_number = &result["sequence_number"];
         println!("{}", sequence_number);
-        let tc_account = LocalAccount::new(
+
+        LocalAccount::new(
             treasury_account_address,
             private_key,
             sequence_number.as_u64().unwrap(),
-        );
-        tc_account
+        )
     }
     pub fn create_parent_vasp_account(
         &self,
@@ -264,10 +262,10 @@ impl JsonRpcTestHelper {
         tc_account: &mut LocalAccount,
     ) -> LocalAccount {
         let faucet = FaucetClient::new(
-            JsonRpcTestHelper::get_mint_url().to_owned(),
-            JsonRpcTestHelper::get_json_rpc_url().to_owned(),
+            JsonRpcTestHelper::get_mint_url(),
+            JsonRpcTestHelper::get_json_rpc_url(),
         );
-        let env = JsonRpcTestHelper::new(JsonRpcTestHelper::get_json_rpc_url().to_owned());
+        let env = JsonRpcTestHelper::new(JsonRpcTestHelper::get_json_rpc_url());
 
         let vasp = LocalAccount::generate(&mut OsRng);
 
@@ -290,7 +288,7 @@ impl JsonRpcTestHelper {
             )
             .unwrap();
 
-        return vasp;
+        vasp
     }
 
     pub fn create_parent_and_one_child_account(
@@ -300,10 +298,10 @@ impl JsonRpcTestHelper {
         tc_account: &mut LocalAccount,
     ) -> (LocalAccount, LocalAccount) {
         let faucet = FaucetClient::new(
-            JsonRpcTestHelper::get_mint_url().to_owned(),
-            JsonRpcTestHelper::get_json_rpc_url().to_owned(),
+            JsonRpcTestHelper::get_mint_url(),
+            JsonRpcTestHelper::get_json_rpc_url(),
         );
-        let mut env = JsonRpcTestHelper::new(JsonRpcTestHelper::get_json_rpc_url().to_owned());
+        let env = JsonRpcTestHelper::new(JsonRpcTestHelper::get_json_rpc_url());
 
         let mut vasp = LocalAccount::generate(&mut OsRng);
         let child_1 = LocalAccount::generate(&mut OsRng);
@@ -344,7 +342,7 @@ impl JsonRpcTestHelper {
             )
             .unwrap();
 
-        return (vasp, child_1);
+        (vasp, child_1)
     }
 
     pub fn create_parent_and_two_child_accounts(
@@ -354,10 +352,10 @@ impl JsonRpcTestHelper {
         tc_account: &mut LocalAccount,
     ) -> (LocalAccount, LocalAccount, LocalAccount) {
         let faucet = FaucetClient::new(
-            JsonRpcTestHelper::get_mint_url().to_owned(),
-            JsonRpcTestHelper::get_json_rpc_url().to_owned(),
+            JsonRpcTestHelper::get_mint_url(),
+            JsonRpcTestHelper::get_json_rpc_url(),
         );
-        let mut env = JsonRpcTestHelper::new(JsonRpcTestHelper::get_json_rpc_url().to_owned());
+        let env = JsonRpcTestHelper::new(JsonRpcTestHelper::get_json_rpc_url());
 
         let mut vasp = LocalAccount::generate(&mut OsRng);
         let child_1 = LocalAccount::generate(&mut OsRng);
@@ -416,7 +414,7 @@ impl JsonRpcTestHelper {
             )
             .unwrap();
 
-        return (vasp, child_1, child_2);
+        (vasp, child_1, child_2)
     }
     pub fn update_testnet_attestation_limit(
         &self,
@@ -434,7 +432,7 @@ impl JsonRpcTestHelper {
         sender: &mut LocalAccount,
         secondary_signers: &[&mut LocalAccount],
         payload: diem_sdk::types::transaction::TransactionPayload,
-        chainId: ChainId,
+        chain_id: ChainId,
     ) -> SignedTransaction {
         let seq_onchain = self
             .get_account_sequence(sender.address())
@@ -450,7 +448,7 @@ impl JsonRpcTestHelper {
             0,
             XUS_NAME.to_owned(),
             60,
-            chainId,
+            chain_id,
         );
         raw_txn
             .sign_multi_agent(
