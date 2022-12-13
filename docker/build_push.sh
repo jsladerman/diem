@@ -68,9 +68,9 @@ fi
 tag_name=${INPUT_NAME//-/_}
 
 #The name of the docker image built in the "auto" branch
-PRE_NAME=$ORG/${tag_name}:pre_${BRANCH}_${GIT_REV}
+PRE_NAME=$ORG/${tag_name}:pre_${BRANCH}
 #the name of the docker image build in the release branch
-PUB_NAME=$ORG/${tag_name}:${BRANCH}_${GIT_REV}
+PUB_NAME=$ORG/${tag_name}:${BRANCH}
 
 #If not a prebuild *attempt* to pull the previously built image.
 if [ $PREBUILD != "true" ]; then
